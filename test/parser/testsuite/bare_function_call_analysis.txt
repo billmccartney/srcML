@@ -1,0 +1,51 @@
+Bare Function Call Analysis
+===========================
+Date: 2026-04-05
+Branch: bare_function_fix (identical to develop at ddab5fdde)
+Build: Docker srcml/ubuntu:latest container, CMake Release build
+
+Summary: All bare function call patterns are correctly parsed as
+<expr_stmt><expr><call> on the current develop branch. The described
+bug (misclassification as <decl_stmt><decl> or <function_decl>) does
+NOT reproduce.
+
+Test Results
+------------
+
+Test 1: foo(x);  — bare call with single identifier argument
+  Result: CORRECT — <expr_stmt><expr><call>
+  Output: <expr_stmt><expr><call><name>foo</name><argument_list>(<argument><expr><name>x</name></expr></argument>)</argument_list></call></expr>;</expr_stmt>
+
+Test 2: foo(x, y);  — bare call with multiple arguments
+  Result: CORRECT — <expr_stmt><expr><call>
+  Output: <expr_stmt><expr><call><name>foo</name><argument_list>(<argument><expr><name>x</name></expr></argument>, <argument><expr><name>y</name></expr></argument>)</argument_list></call></expr>;</expr_stmt>
+
+Test 3: bar(1);  — bare call with literal argument
+  Result: CORRECT — <expr_stmt><expr><call>
+  Output: <expr_stmt><expr><call><name>bar</name><argument_list>(<argument><expr><literal type="number">1</literal></expr></argument>)</argument_list></call></expr>;</expr_stmt>
+
+Test 4: foo(x); bar(y);  — multiple bare calls
+  Result: CORRECT — both parsed as <expr_stmt><expr><call>
+  Output: <expr_stmt><expr><call><name>foo</name>...</call></expr>;</expr_stmt> <expr_stmt><expr><call><name>bar</name>...</call></expr>;</expr_stmt>
+
+Test 5: void f() { foo(x); }  — bare call in function body context
+  Result: CORRECT — <function> wrapping <expr_stmt><expr><call>
+  Output: <function><type><name>void</name></type> <name>f</name><parameter_list>()</parameter_list> <block>{<block_content> <expr_stmt><expr><call><name>foo</name><argument_list>(<argument><expr><name>x</name></expr></argument>)</argument_list></call></expr>;</expr_stmt> </block_content>}</block></function>
+
+Test 6: foo(x);  — bare call at file/global scope
+  Result: CORRECT — <expr_stmt><expr><call> (same as Test 1)
+
+Edge Cases (Additional)
+-----------------------
+
+Edge 1: size(n);  — name that could look like a type
+  Result: CORRECT — <expr_stmt><expr><call>
+
+Edge 2: typedef int foo; foo(x);  — call after typedef of same name
+  Result: CORRECT — <typedef> followed by <expr_stmt><expr><call>
+
+Edge 3: struct s { int x; }; foo(x);  — call after struct definition
+  Result: CORRECT — <struct> followed by <expr_stmt><expr><call>
+
+Edge 4: void g(); foo(x);  — call after function declaration
+  Result: CORRECT — <function_decl> followed by <expr_stmt><expr><call>
